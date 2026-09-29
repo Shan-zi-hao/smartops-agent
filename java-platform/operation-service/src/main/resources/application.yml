@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: operation-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+smartops:
+  prometheus-url: ${SMARTOPS_PROMETHEUS_URL:http://localhost:19090}
+  loki-url: ${SMARTOPS_LOKI_URL:http://localhost:13100}
+  docker-host: ${SMARTOPS_DOCKER_HOST:unix:///var/run/docker.sock}
+  compose-project: ${SMARTOPS_COMPOSE_PROJECT:agent_codex}
+  restart-token: ${SMARTOPS_RESTART_TOKEN:}

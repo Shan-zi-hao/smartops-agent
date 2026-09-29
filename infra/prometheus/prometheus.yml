@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: spring-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["order-service:8080"]
+        labels:
+          service: order-service
+      - targets: ["user-service:8080"]
+        labels:
+          service: user-service
+      - targets: ["payment-service:8080"]
+        labels:
+          service: payment-service

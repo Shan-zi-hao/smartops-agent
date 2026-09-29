@@ -1,0 +1,29 @@
+server:
+  port: 9000
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: ai-service
+              uri: ${AI_SERVICE_URL:http://127.0.0.1:8000}
+              predicates:
+                - Path=/ai/**
+              filters:
+                - StripPrefix=1
+            - id: operation-service
+              uri: ${OPERATION_SERVICE_URL:http://127.0.0.1:8083}
+              predicates:
+                - Path=/op/**
+              filters:
+                - StripPrefix=1
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+            cors-configurations:
+              '[/**]':
+                allowedOrigins: '*'
+                allowedMethods: '*'
+                allowedHeaders: '*'
+                maxAge: 3600

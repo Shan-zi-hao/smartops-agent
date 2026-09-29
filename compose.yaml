@@ -1,0 +1,105 @@
+services:
+  redis-app:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  order-service:
+    build: ./java-platform/order-service
+    depends_on:
+      redis-app:
+        condition: service_healthy
+    environment:
+      SPRING_DATA_REDIS_HOST: redis-app
+    ports:
+      - "8080:8080"
+
+  user-service:
+    build: ./java-platform/user-service
+    ports:
+      - "8081:8080"
+
+  payment-service:
+    build: ./java-platform/payment-service
+    ports:
+      - "8082:8080"
+
+  operation-service:
+    build: ./java-platform/operation-service
+    environment:
+      SMARTOPS_PROMETHEUS_URL: http://prometheus:9090
+      SMARTOPS_LOKI_URL: http://loki:3100
+      SMARTOPS_COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-agent_codex}
+      SMARTOPS_RESTART_TOKEN: ${SMARTOPS_RESTART_TOKEN:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - prometheus
+      - loki
+    ports:
+      - "127.0.0.1:8083:8080"
+
+  agent-service:
+    build: ./python-agent
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-qwen3.8-27b}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://ws-xitphf35sqxqrwsx.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}
+      OPERATION_SERVICE_URL: http://operation-service:8080
+    depends_on:
+      - operation-service
+    ports:
+      - "127.0.0.1:18000:8000"
+
+  gateway-service:
+    build: ./java-platform/gateway-service
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      AI_SERVICE_URL: http://agent-service:8000
+      OPERATION_SERVICE_URL: http://operation-service:8080
+    depends_on:
+      agent-service:
+        condition: service_started
+    ports:
+      - "127.0.0.1:9000:9000"
+
+  web-frontend:
+    build: ./web-frontend
+    depends_on:
+      - gateway-service
+    ports:
+      - "127.0.0.1:13000:80"
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus"]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:19090:9090"
+
+  loki:
+    image: grafana/loki:3.5.0
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./infra/loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:13100:3100"
+
+  alloy:
+    image: grafana/alloy:v1.9.2
+    command: ["run", "/etc/alloy/config.alloy"]
+    volumes:
+      - ./infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+
+volumes:
+  prometheus-data:
+  loki-data:
